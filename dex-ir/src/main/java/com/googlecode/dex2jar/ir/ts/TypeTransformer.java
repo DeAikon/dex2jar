@@ -16,8 +16,7 @@
  */
 package com.googlecode.dex2jar.ir.ts;
 
-import java.util.*;
-
+import com.googlecode.d2j.DexType;
 import com.googlecode.dex2jar.ir.IrMethod;
 import com.googlecode.dex2jar.ir.TypeClass;
 import com.googlecode.dex2jar.ir.expr.*;
@@ -29,14 +28,16 @@ import com.googlecode.dex2jar.ir.stmt.Stmt.E1Stmt;
 import com.googlecode.dex2jar.ir.stmt.Stmt.E2Stmt;
 import com.googlecode.dex2jar.ir.stmt.Stmt.ST;
 
+import java.util.*;
+
 /**
  * Type and correct Exprs
- * 
+ *
  * @author Bob Pan
  */
 public class TypeTransformer implements Transformer {
 
-    private static final String[] possibleIntTypes = new String[] { "B", "S", "C", "I" };
+    private static final String[] possibleIntTypes = new String[]{"B", "S", "C", "I"};
 
     @Override
     public void transform(IrMethod irMethod) {
@@ -54,39 +55,39 @@ public class TypeTransformer implements Transformer {
             if (ref.value.vt == VT.CONSTANT) {
                 Constant cst = (Constant) ref.value;
                 switch (type.charAt(0)) {
-                case '[':
-                case 'L':
-                    if (Integer.valueOf(0).equals(cst.value)) {
-                        cst.value = Constant.Null;
-                    }
-                    if (type.equals("[F") && cst.value instanceof int[]) {
-                        int x[] = (int[]) cst.value;
-                        float f[] = new float[x.length];
-                        for (int i = 0; i < x.length; i++) {
-                            f[i] = Float.intBitsToFloat(x[i]);
+                    case '[':
+                    case 'L':
+                        if (Integer.valueOf(0).equals(cst.value)) {
+                            cst.value = Constant.Null;
                         }
-                        cst.value = f;
-                    }
-                    if (type.equals("[D") && cst.value instanceof long[]) {
-                        long x[] = (long[]) cst.value;
-                        double f[] = new double[x.length];
-                        for (int i = 0; i < x.length; i++) {
-                            f[i] = Double.longBitsToDouble(x[i]);
+                        if (type.equals("[F") && cst.value instanceof int[]) {
+                            int x[] = (int[]) cst.value;
+                            float f[] = new float[x.length];
+                            for (int i = 0; i < x.length; i++) {
+                                f[i] = Float.intBitsToFloat(x[i]);
+                            }
+                            cst.value = f;
                         }
-                        cst.value = f;
-                    }
-                    break;
-                case 'F':
-                    if (!(cst.value instanceof Float)) {
-                        cst.value = Float.intBitsToFloat(((Number) cst.value).intValue());
-                    }
-                    break;
-                case 'D':
-                    if (!(cst.value instanceof Double)) {
-                        cst.value = Double.longBitsToDouble(((Number) cst.value).longValue());
-                    }
-                    break;
-                default:
+                        if (type.equals("[D") && cst.value instanceof long[]) {
+                            long x[] = (long[]) cst.value;
+                            double f[] = new double[x.length];
+                            for (int i = 0; i < x.length; i++) {
+                                f[i] = Double.longBitsToDouble(x[i]);
+                            }
+                            cst.value = f;
+                        }
+                        break;
+                    case 'F':
+                        if (!(cst.value instanceof Float)) {
+                            cst.value = Float.intBitsToFloat(((Number) cst.value).intValue());
+                        }
+                        break;
+                    case 'D':
+                        if (!(cst.value instanceof Double)) {
+                            cst.value = Double.longBitsToDouble(((Number) cst.value).longValue());
+                        }
+                        break;
+                    default:
                 }
             }
             Value value = ref.value;
@@ -96,11 +97,80 @@ public class TypeTransformer implements Transformer {
         }
     }
 
+    enum Relation {
+
+        R_sameValues {
+            @Override
+            Set<TypeRef> get(TypeRef obj) {
+                return obj.sameValues;
+            }
+
+            @Override
+            void set(TypeRef obj, Set<TypeRef> v) {
+                obj.sameValues = v;
+            }
+        }, R_gArrayValues {
+            @Override
+            Set<TypeRef> get(TypeRef obj) {
+                return obj.gArrayValues;
+            }
+
+            @Override
+            void set(TypeRef obj, Set<TypeRef> v) {
+                obj.gArrayValues = v;
+            }
+        }, R_sArrayValues {
+            @Override
+            Set<TypeRef> get(TypeRef obj) {
+                return obj.sArrayValues;
+            }
+
+            @Override
+            void set(TypeRef obj, Set<TypeRef> v) {
+                obj.sArrayValues = v;
+            }
+        }, R_arrayRoots {
+            @Override
+            Set<TypeRef> get(TypeRef obj) {
+                return obj.arrayRoots;
+            }
+
+            @Override
+            void set(TypeRef obj, Set<TypeRef> v) {
+                obj.arrayRoots = v;
+            }
+        }, R_parents {
+            @Override
+            Set<TypeRef> get(TypeRef obj) {
+                return obj.parents;
+            }
+
+            @Override
+            void set(TypeRef obj, Set<TypeRef> v) {
+                obj.parents = v;
+            }
+        }, R_children {
+            @Override
+            Set<TypeRef> get(TypeRef obj) {
+                return obj.children;
+            }
+
+            @Override
+            void set(TypeRef obj, Set<TypeRef> v) {
+                obj.children = v;
+            }
+        };
+
+        abstract Set<TypeRef> get(TypeRef obj);
+
+        abstract void set(TypeRef obj, Set<TypeRef> v);
+    }
+
     public static class TypeRef {
 
         public final Value value;
         /**
-         * same use, have same {@link #clz}
+         * same use, have same
          */
         public Set<TypeRef> sameValues = null;
         /**
@@ -109,84 +179,81 @@ public class TypeTransformer implements Transformer {
         public Set<TypeRef> gArrayValues = null;
         public Set<TypeRef> sArrayValues = null;
         /**
-        * reference to root
-        */
-        public TypeRef arrayRoot = null;
+         * reference to root
+         */
+        public Set<TypeRef> arrayRoots = null;
+
         public Set<TypeRef> parents = null;
         public Set<TypeRef> children = null;
 
-        public void setArrayValueShareT(SharedT arrayValueShareT) {
-            this.arrayValueShareT = arrayValueShareT;
-        }
+        public TypeClass clz = TypeClass.UNKNOWN;
+        public String provideDesc = null;
+        public Set<String> uses;
 
-        public TypeClass getClz() {
-            return t.getReal().clz;
-        }
+        private TypeRef next;
 
-        public void setClz(TypeClass clz) {
-            this.t.getReal().clz = clz;
-        }
-
-        static class SharedT {
-            private TypeClass clz = TypeClass.UNKNOWN;
-            private String provideDesc = null;
-            private Set<String> uses;
-            SharedT next;
-
-            SharedT getReal() {
-                SharedT _this = this;
-                SharedT _next = this.next;
-                while (_next != null) {
-                    _this = _next;
-                    _next = _next.next;
-                }
-                return _this;
+        public void merge(TypeRef other) {
+            assert this.next == null;
+            TypeRef a = this;
+            TypeRef b = other.getReal();
+            if (a == b) {
+                return;
             }
 
-            boolean merge(SharedT b) {
-                SharedT a = this;
-                if (a == b) {
-                    return false;
-                }
-                b.next = a;
-                if (a.provideDesc == null) {
-                    a.provideDesc = b.provideDesc;
-                } else if (b.provideDesc != null) {
-                    a.provideDesc = TypeAnalyze.mergeProviderType(a.provideDesc, b.provideDesc);
-                }
-                if (b.uses != null) {
-                    if (a.uses == null) {
-                        a.uses = new HashSet<>();
-                    }
+            b.next = a;
+
+            relationMerge(a, b, Relation.R_sameValues);
+            relationMerge(a, b, Relation.R_gArrayValues);
+            relationMerge(a, b, Relation.R_sArrayValues);
+            relationMerge(a, b, Relation.R_arrayRoots);
+            relationMerge(a, b, Relation.R_parents);
+            relationMerge(a, b, Relation.R_children);
+
+            if (a.provideDesc == null) {
+                a.provideDesc = b.provideDesc;
+            } else if (b.provideDesc != null) {
+                a.provideDesc = TypeAnalyze.mergeProviderType(a.provideDesc, b.provideDesc);
+            }
+            b.provideDesc = null;
+            if (b.uses != null) {
+                if (a.uses == null) {
+                    a.uses = b.uses;
+                } else {
                     a.uses.addAll(b.uses);
                 }
-                return true;
+                b.uses = null;
+            }
+
+        }
+
+        private static void relationMerge(TypeRef a, TypeRef b, Relation r) {
+            Set<TypeRef> bv = r.get(b);
+            if (bv != null) {
+                Set<TypeRef> av = r.get(a);
+                Set<TypeRef> merged;
+                if (av == null) {
+                    merged = bv;
+                    r.set(a, merged);
+                } else {
+                    merged = av;
+                    merged.addAll(bv);
+                }
+                merged.remove(a);
+                merged.remove(b);
+                r.set(b, null);
             }
         }
 
-        private SharedT arrayValueShareT;
-
-        SharedT getArrayValueShareT() {
-            if (arrayValueShareT == null) {
-                arrayValueShareT = new SharedT();
-                return arrayValueShareT;
-            } else {
-                return arrayValueShareT.getReal();
+        private TypeRef getReal() {
+            TypeRef x = this;
+            while (x.next != null) {
+                x = x.next;
             }
-        }
-
-        boolean mergeT(TypeRef other) {
-            SharedT a = t.getReal();
-            SharedT b = other.t.getReal();
-            this.t = a;
-            other.t = a;
-            if (a != b) {
-                updateTypeClass(other.getClz());
-                return a.merge(b);
+            if (x != this) {
+                this.next = x;
             }
-            return false;
+            return x;
         }
-        SharedT t = new SharedT();
 
         public TypeRef(Value value) {
             super();
@@ -195,84 +262,80 @@ public class TypeTransformer implements Transformer {
 
         @Override
         public String toString() {
-            String p = this.getUses() == null ? "[]" : this.getUses().toString();
-            return getClz() + "::" + value + ": " + this.getProvideDesc() + " > {" + p.substring(1, p.length() - 1) + "}";
+            TypeRef real = getReal();
+            String p = real.uses == null ? "[]" : real.uses.toString();
+            return real.clz + "::" + value + ": " + real.provideDesc + " > {" + p.substring(1, p.length() - 1) + "}";
         }
 
         public String getType() {
-            if (getClz() == TypeClass.OBJECT) {
-                if (getProvideDesc().length() == 1) {
+            TypeRef thiz = getReal();
+            TypeClass clz = thiz.clz;
+            if (clz == TypeClass.OBJECT) {
+                if (thiz.provideDesc.length() == 1) {
                     return "Ljava/lang/Object;";
                 } else {
-                    return getProvideDesc();
+                    return thiz.provideDesc;
                 }
             }
-            if (getClz().fixed && getClz() != TypeClass.INT) {
-                if (getProvideDesc() == null) {
+            if (clz.fixed && clz != TypeClass.INT) {
+                if (thiz.provideDesc == null) {
                     throw new RuntimeException();
                 }
-                return getProvideDesc();
+                return thiz.provideDesc;
             }
-            if (getClz() == TypeClass.JD) { // prefere Long if wide
+            if (clz == TypeClass.JD) { // prefere Long if wide
                 return "J";
             }
-            if (getUses() != null) {
+            if (thiz.uses != null) {
                 for (String t : possibleIntTypes) {
-                    if (getUses().contains(t)) {
+                    if (thiz.uses.contains(t)) {
                         return t;
                     }
                 }
             }
 
-            switch (getClz()) {
-            case ZI:
-                return "I";
-            case ZIFL:
-            case ZIF:
-            case ZIL:
-                return "Z";
-            case INT:
-            case IF:
-                return "I";
-            default:
+            switch (clz) {
+                case ZI:
+                    return "I";
+                case ZIFL:
+                case ZIF:
+                case ZIL:
+                    return "Z";
+                case INT:
+                case IF:
+                    return "I";
+                default:
             }
             throw new RuntimeException();
         }
 
         public boolean updateTypeClass(TypeClass clz) {
-            TypeClass merged = TypeClass.merge(this.getClz(), clz);
-            if (merged == this.getClz()) {
+            assert this.next == null;
+            TypeClass thizClz = this.clz;
+            TypeClass merged = TypeClass.merge(thizClz, clz);
+            if (merged == thizClz) {
                 return false;
             }
-            this.setClz(merged);
+            this.clz = merged;
             return true;
         }
 
         public void clear() {
             this.sArrayValues = null;
-            // this.sArryRoots = null;
             this.gArrayValues = null;
-            // this.gArryRoots = null;
+            this.arrayRoots = null;
             this.parents = null;
-            this.children = null;
             this.children = null;
             this.sameValues = null;
         }
 
-        public Set<String> getUses() {
-            return t.getReal().uses;
-        }
-
-        public String getProvideDesc() {
-            return t.getReal().provideDesc;
-        }
-
-        public void setProvideDesc(String provideDesc) {
-            this.t.getReal().provideDesc = provideDesc;
+        String getProvideDesc() {
+            return getReal().provideDesc;
         }
 
         public boolean addUses(String ele) {
-            SharedT t=this.t.getReal();
+            assert this.next == null;
+            TypeRef t = this;
             if (t.uses != null) {
                 return t.uses.add(ele);
             } else {
@@ -282,6 +345,7 @@ public class TypeTransformer implements Transformer {
         }
 
         public boolean addAllUses(Set<String> uses) {
+            assert this.next == null;
             if (uses != null) {
                 return uses.addAll(uses);
             } else {
@@ -307,26 +371,19 @@ public class TypeTransformer implements Transformer {
         }
 
         private void fixTypes() {
-
             // 1. collect all Array Roots
-            UniqueQueue<TypeRef> q = new UniqueQueue<>();
             Set<TypeRef> arrayRoots = new HashSet<>();
-            for (TypeRef t : refs) {
-                if (t.gArrayValues != null || t.sArrayValues != null) {
-                    arrayRoots.add(t);
-                    q.add(t);
+            for (TypeRef ref : refs) {
+                ref = ref.getReal();
+                if (ref.gArrayValues != null || ref.sArrayValues != null) {
+                    arrayRoots.add(ref);
                 }
-            }
-            while (!q.isEmpty()) {
-                TypeRef ref = q.poll();
-                TypeRef.SharedT arrayValue=ref.getArrayValueShareT();
-                if(ref.gArrayValues!=null){
-                    for(TypeRef t:ref.gArrayValues){
-
-                    }
-                }
+                mergeArrayRelation(ref, Relation.R_gArrayValues);
+                mergeArrayRelation(ref, Relation.R_sArrayValues);
+                mergeArrayRelation(ref, Relation.R_arrayRoots);
             }
 
+            UniqueQueue<TypeRef> q = new UniqueQueue<>();
             q.addAll(refs);
             while (!q.isEmpty()) {
                 // 2. merge provided type to children. merge uses to parent. merge TypeClass to sameValues
@@ -336,13 +393,16 @@ public class TypeTransformer implements Transformer {
                 }
                 // 3. merge type from Array Roots to Array Values
                 for (TypeRef ref : arrayRoots) {
-                    String provideDesc = ref.getProvideDesc();
+                    ref = ref.getReal();
+                    String provideDesc = ref.provideDesc;
                     if (provideDesc != null && provideDesc.charAt(0) == '[') {
                         String ele = provideDesc.substring(1);
 
+                        TypeClass clz = TypeClass.clzOf(ele);
                         if (ref.gArrayValues != null) {
                             for (TypeRef p : ref.gArrayValues) {
-                                if (p.updateTypeClass(TypeClass.clzOf(ele))) {
+                                p = p.getReal();
+                                if (p.updateTypeClass(clz)) {
                                     q.add(p);
                                 }
                                 mergeTypeToArrayGetValue(ele, p, q);
@@ -350,7 +410,8 @@ public class TypeTransformer implements Transformer {
                         }
                         if (ref.sArrayValues != null) {
                             for (TypeRef p : ref.sArrayValues) {
-                                if (p.updateTypeClass(TypeClass.clzOf(ele))) {
+                                p = p.getReal();
+                                if (p.updateTypeClass(clz)) {
                                     q.add(p);
                                 }
                                 if (p.addUses(ele)) {
@@ -363,26 +424,39 @@ public class TypeTransformer implements Transformer {
             }
         }
 
+        private void mergeArrayRelation(TypeRef ref, Relation r) {
+            Set<TypeRef> v = r.get(ref);
+            if (v != null && v.size() > 1) {
+                List<TypeRef> copy = new ArrayList<>(v);
+                TypeRef mergeTo = copy.get(0).getReal();
+                for (int i = 1; i < copy.size(); i++) {
+                    mergeTo.merge(copy.get(i));
+                }
+            }
+        }
+
         private static void mergeTypeToArrayGetValue(String type, TypeRef target, UniqueQueue<TypeRef> q) {
-            if (target.getProvideDesc() == null) {
-                target.setProvideDesc(type);
+            target = target.getReal();
+            if (target.provideDesc == null) {
+                target.provideDesc = type;
                 q.add(target);
             } else {
-                String mergedType = mergeTypeEx(type, target.getProvideDesc());
-                if (!mergedType.equals(target.getProvideDesc())) {
-                    target.setProvideDesc(mergedType);
+                String mergedType = mergeTypeEx(type, target.provideDesc);
+                if (!mergedType.equals(target.provideDesc)) {
+                    target.provideDesc = mergedType;
                     q.add(target);
                 }
             }
         }
+
         private static void mergeTypeToSubRef(String type, TypeRef target, UniqueQueue<TypeRef> q) {
-            if (target.getProvideDesc() == null) {
-                target.setProvideDesc(type);
+            if (target.provideDesc == null) {
+                target.provideDesc = type;
                 q.add(target);
             } else {
-                String mergedType = mergeProviderType(type, target.getProvideDesc());
-                if (!mergedType.equals(target.getProvideDesc())) {
-                    target.setProvideDesc(mergedType);
+                String mergedType = mergeProviderType(type, target.provideDesc);
+                if (!mergedType.equals(target.provideDesc)) {
+                    target.provideDesc = mergedType;
                     q.add(target);
                 }
             }
@@ -443,31 +517,33 @@ public class TypeTransformer implements Transformer {
         }
 
         private void copyTypes(UniqueQueue<TypeRef> q, TypeRef ref) {
-            TypeClass clz = ref.getClz();
+            ref = ref.getReal();
+            TypeClass clz = ref.clz;
 
             switch (clz) {
-            case BOOLEAN:
-            case FLOAT:
-            case LONG:
-            case DOUBLE:
-            case VOID:
-                ref.setProvideDesc(clz.name);
-                break;
-            default:
+                case BOOLEAN:
+                case FLOAT:
+                case LONG:
+                case DOUBLE:
+                case VOID:
+                    ref.provideDesc = clz.name;
+                    break;
+                default:
             }
-            String provideDesc = ref.getProvideDesc();
+            String provideDesc = ref.provideDesc;
             if (provideDesc == null && ref.parents != null && ref.parents.size() > 1) {
                 if (isAllParentSetted(ref)) {
-                    ref.setProvideDesc(provideDesc = mergeParentType(ref.parents));
+                    ref.provideDesc = provideDesc = mergeParentType(ref.parents);
                 }
             }
             if (ref.parents != null) {
                 for (TypeRef p : ref.parents) {
+                    p = p.getReal();
                     if (p.updateTypeClass(clz)) {
                         q.add(p);
                     }
-                    if (ref.getUses() != null) {
-                        if (p.addAllUses(ref.getUses())) {
+                    if (ref.uses != null) {
+                        if (p.addAllUses(ref.uses)) {
                             q.add(p);
                         }
                     }
@@ -475,6 +551,7 @@ public class TypeTransformer implements Transformer {
             }
             if (ref.children != null) {
                 for (TypeRef p : ref.children) {
+                    p = p.getReal();
                     if (p.updateTypeClass(clz)) {
                         q.add(p);
                     }
@@ -486,6 +563,7 @@ public class TypeTransformer implements Transformer {
             }
             if (ref.sameValues != null) {
                 for (TypeRef p : ref.sameValues) {
+                    p = p.getReal();
                     if (p.updateTypeClass(clz)) {
                         q.add(p);
                     }
@@ -531,6 +609,10 @@ public class TypeTransformer implements Transformer {
             } else if (!ta.fixed && tb.fixed) {
                 return b;
             } else if (ta.fixed && tb.fixed) {
+                // special allow merge of Z and I
+                if ((ta == TypeClass.INT && tb == TypeClass.BOOLEAN) || (tb == TypeClass.INT && ta == TypeClass.BOOLEAN)) {
+                    return "I";
+                }
                 if (ta != tb) {
                     throw new RuntimeException();
                 }
@@ -602,121 +684,121 @@ public class TypeTransformer implements Transformer {
 
         private void e0expr(E0Expr op, boolean getValue) {
             switch (op.vt) {
-            case LOCAL:
-                break;
-            case NEW:
-                NewExpr newExpr = (NewExpr) op;
-                provideAs(newExpr, newExpr.type);
-                break;
-            case THIS_REF:
-            case PARAMETER_REF:
-            case EXCEPTION_REF:
-                RefExpr refExpr = (RefExpr) op;
-                String refType = refExpr.type;
-                if (refType == null && op.vt == VT.EXCEPTION_REF) {
-                    refType = "Ljava/lang/Throwable;";
-                }
-                provideAs(refExpr, refType);
-                break;
-            case STATIC_FIELD:
-                StaticFieldExpr fe = (StaticFieldExpr) op;
-                if (getValue) {// getfield
-                    provideAs(fe, fe.type);
-                } else {// putfield
-                    useAs(fe, fe.type);
-                }
-                break;
-            case CONSTANT:
-                Constant cst = (Constant) op;
-                Object value = cst.value;
-                if (value instanceof String) {
-                    provideAs(cst, "Ljava/lang/String;");
-                } else if (value instanceof Constant.Type) {
-                    provideAs(cst, "Ljava/lang/Class;");
-                } else if (value instanceof Number) {
-                    if (value instanceof Integer || value instanceof Byte || value instanceof Short) {
-                        int a = ((Number) value).intValue();
-                        if (a == 0) {
-                            provideAs(cst, TypeClass.ZIFL.name); // zero, false or, float
-                        } else if (a == 1) {
-                            provideAs(cst, TypeClass.ZIF.name);
-                        } else {
-                            provideAs(cst, TypeClass.IF.name);
-                        }
-                    } else if (value instanceof Long) {
-                        provideAs(cst, "w");
-                    } else if (value instanceof Float) {
-                        provideAs(cst, "F");
-                    } else if (value instanceof Double) {
-                        provideAs(cst, "D");
+                case LOCAL:
+                    break;
+                case NEW:
+                    NewExpr newExpr = (NewExpr) op;
+                    provideAs(newExpr, newExpr.type);
+                    break;
+                case THIS_REF:
+                case PARAMETER_REF:
+                case EXCEPTION_REF:
+                    RefExpr refExpr = (RefExpr) op;
+                    String refType = refExpr.type;
+                    if (refType == null && op.vt == VT.EXCEPTION_REF) {
+                        refType = "Ljava/lang/Throwable;";
                     }
-                } else if (value instanceof Character) {
-                    provideAs(cst, "C");
-                } else {
-                    provideAs(cst, "L");
-                }
-                break;
-            default:
+                    provideAs(refExpr, refType);
+                    break;
+                case STATIC_FIELD:
+                    StaticFieldExpr fe = (StaticFieldExpr) op;
+                    if (getValue) {// getfield
+                        provideAs(fe, fe.type);
+                    } else {// putfield
+                        useAs(fe, fe.type);
+                    }
+                    break;
+                case CONSTANT:
+                    Constant cst = (Constant) op;
+                    Object value = cst.value;
+                    if (value instanceof String) {
+                        provideAs(cst, "Ljava/lang/String;");
+                    } else if (value instanceof DexType) {
+                        provideAs(cst, "Ljava/lang/Class;");
+                    } else if (value instanceof Number) {
+                        if (value instanceof Integer || value instanceof Byte || value instanceof Short) {
+                            int a = ((Number) value).intValue();
+                            if (a == 0) {
+                                provideAs(cst, TypeClass.ZIFL.name); // zero, false or, float
+                            } else if (a == 1) {
+                                provideAs(cst, TypeClass.ZIF.name);
+                            } else {
+                                provideAs(cst, TypeClass.IF.name);
+                            }
+                        } else if (value instanceof Long) {
+                            provideAs(cst, "w");
+                        } else if (value instanceof Float) {
+                            provideAs(cst, "F");
+                        } else if (value instanceof Double) {
+                            provideAs(cst, "D");
+                        }
+                    } else if (value instanceof Character) {
+                        provideAs(cst, "C");
+                    } else {
+                        provideAs(cst, "L");
+                    }
+                    break;
+                default:
             }
         }
 
         private void e1expr(E1Expr e1, boolean getValue) {
             Value v = e1.op;
             switch (e1.vt) {
-            case CAST:
-                CastExpr ce = (CastExpr) e1;
-                if (ce.to.equals("B")) { // special case for I2B
-                    useAs(v, TypeClass.ZI.name);
-                    provideAs(e1, TypeClass.ZI.name);
-                } else {
-                    useAs(v, ce.from);
-                    provideAs(e1, ce.to);
-                }
-                break;
-            case FIELD:
-                FieldExpr fe = (FieldExpr) e1;
-                if (getValue) {// getfield
-                    provideAs(fe, fe.type);
-                } else {// putfield
-                    useAs(fe, fe.type);
-                }
-                if (v != null) {
-                    useAs(v, fe.owner);
-                }
-                break;
+                case CAST:
+                    CastExpr ce = (CastExpr) e1;
+                    if (ce.to.equals("B")) { // special case for I2B
+                        useAs(v, TypeClass.ZI.name);
+                        provideAs(e1, TypeClass.ZI.name);
+                    } else {
+                        useAs(v, ce.from);
+                        provideAs(e1, ce.to);
+                    }
+                    break;
+                case FIELD:
+                    FieldExpr fe = (FieldExpr) e1;
+                    if (getValue) {// getfield
+                        provideAs(fe, fe.type);
+                    } else {// putfield
+                        useAs(fe, fe.type);
+                    }
+                    if (v != null) {
+                        useAs(v, fe.owner);
+                    }
+                    break;
 
-            case CHECK_CAST: {
-                TypeExpr te = (TypeExpr) e1;
-                provideAs(te, te.type);
-                useAs(v, "L");
-            }
+                case CHECK_CAST: {
+                    TypeExpr te = (TypeExpr) e1;
+                    provideAs(te, te.type);
+                    useAs(v, "L");
+                }
                 break;
-            case INSTANCE_OF: {
-                TypeExpr te = (TypeExpr) e1;
-                provideAs(te, "Z");
-                useAs(v, "L");
-            }
+                case INSTANCE_OF: {
+                    TypeExpr te = (TypeExpr) e1;
+                    provideAs(te, "Z");
+                    useAs(v, "L");
+                }
                 break;
-            case NEW_ARRAY: {
-                TypeExpr te = (TypeExpr) e1;
-                provideAs(te, "[" + te.type);
-                useAs(v, "I");
-            }
+                case NEW_ARRAY: {
+                    TypeExpr te = (TypeExpr) e1;
+                    provideAs(te, "[" + te.type);
+                    useAs(v, "I");
+                }
                 break;
-            case LENGTH: {
-                UnopExpr ue = (UnopExpr) e1;
-                provideAs(ue, "I");
-                useAs(v, "[?");
-            }
+                case LENGTH: {
+                    UnopExpr ue = (UnopExpr) e1;
+                    provideAs(ue, "I");
+                    useAs(v, "[?");
+                }
                 break;
-            case NEG:
-            case NOT: {
-                UnopExpr ue = (UnopExpr) e1;
-                provideAs(ue, ue.type);
-                useAs(v, ue.type);
-            }
+                case NEG:
+                case NOT: {
+                    UnopExpr ue = (UnopExpr) e1;
+                    provideAs(ue, ue.type);
+                    useAs(v, ue.type);
+                }
                 break;
-            default:
+                default:
             }
             if (v != null) {
                 exExpr(v);
@@ -727,89 +809,89 @@ public class TypeTransformer implements Transformer {
             Value a = e2.op1.trim();
             Value b = e2.op2.trim();
             switch (e2.vt) {
-            case ARRAY:
-                useAs(b, "I");
-                String elementType = ((ArrayExpr) e2).elementType;
-                // TypeClass ts = TypeClass.clzOf(elementType);
-                useAs(a, "[" + elementType);
-                if (getValue) {
-                    provideAs(e2, elementType);
+                case ARRAY:
+                    useAs(b, "I");
+                    String elementType = ((ArrayExpr) e2).elementType;
+                    // TypeClass ts = TypeClass.clzOf(elementType);
+                    useAs(a, "[" + elementType);
+                    if (getValue) {
+                        provideAs(e2, elementType);
 
-                    linkGetArray(a, e2);
-                } else {
-                    useAs(e2, elementType);
+                        linkGetArray(a, e2);
+                    } else {
+                        useAs(e2, elementType);
 
-                    linkSetArray(a, e2);
+                        linkSetArray(a, e2);
+                    }
+                    break;
+                case LCMP:
+                case FCMPG:
+                case FCMPL:
+                case DCMPG:
+                case DCMPL: {
+                    BinopExpr be = (BinopExpr) e2;
+                    useAs(a, be.type);
+                    useAs(b, be.type);
+                    provideAs(e2, "I");
                 }
                 break;
-            case LCMP:
-            case FCMPG:
-            case FCMPL:
-            case DCMPG:
-            case DCMPL: {
-                BinopExpr be = (BinopExpr) e2;
-                useAs(a, be.type);
-                useAs(b, be.type);
-                provideAs(e2, "I");
-            }
+                case EQ:
+                case NE: {
+                    useAs(e2.getOp2(), TypeClass.ZIL.name);
+                    useAs(e2.getOp1(), TypeClass.ZIL.name);
+                    linkSameAs(e2.getOp1(), e2.getOp2());
+                    provideAs(e2, "Z");
+                }
                 break;
-            case EQ:
-            case NE: {
-                useAs(e2.getOp2(), TypeClass.ZIL.name);
-                useAs(e2.getOp1(), TypeClass.ZIL.name);
-                linkSameAs(e2.getOp1(), e2.getOp2());
-                provideAs(e2, "Z");
-            }
+                case GE:
+                case GT:
+                case LE:
+                case LT: {
+                    BinopExpr be = (BinopExpr) e2;
+                    useAs(a, be.type);
+                    useAs(b, be.type);
+                    provideAs(e2, "Z");
+                }
                 break;
-            case GE:
-            case GT:
-            case LE:
-            case LT: {
-                BinopExpr be = (BinopExpr) e2;
-                useAs(a, be.type);
-                useAs(b, be.type);
-                provideAs(e2, "Z");
-            }
-                break;
-            case ADD:
-            case SUB:
-            case IDIV:
-            case LDIV:
-            case FDIV:
-            case DDIV:
-            case MUL:
-            case REM: {
-                BinopExpr be = (BinopExpr) e2;
-                useAs(a, be.type);
-                useAs(b, be.type);
-                provideAs(e2, be.type);
-            }
-                break;
-            case OR:
-            case AND:
-            case XOR: {
-                BinopExpr be = (BinopExpr) e2;
-                useAs(a, be.type);
-                useAs(b, be.type);
-                // linkSameAs(a, b);
-                if ("J".equals(be.type) || "w".equals(be.type)) {
+                case ADD:
+                case SUB:
+                case IDIV:
+                case LDIV:
+                case FDIV:
+                case DDIV:
+                case MUL:
+                case REM: {
+                    BinopExpr be = (BinopExpr) e2;
+                    useAs(a, be.type);
+                    useAs(b, be.type);
                     provideAs(e2, be.type);
-                } else {
-                    provideAs(e2, TypeClass.ZI.name);
                 }
-            }
                 break;
-            case SHL:
-            case SHR:
-            case USHR: {
-                BinopExpr be = (BinopExpr) e2;
-                useAs(a, be.type);
-                useAs(b, "I");
-                provideAs(e2, be.type);
-            }
+                case OR:
+                case AND:
+                case XOR: {
+                    BinopExpr be = (BinopExpr) e2;
+                    useAs(a, be.type);
+                    useAs(b, be.type);
+                    // linkSameAs(a, b);
+                    if ("J".equals(be.type) || "w".equals(be.type)) {
+                        provideAs(e2, be.type);
+                    } else {
+                        provideAs(e2, TypeClass.ZI.name);
+                    }
+                }
                 break;
-            default:
-                throw new UnsupportedOperationException();
+                case SHL:
+                case SHR:
+                case USHR: {
+                    BinopExpr be = (BinopExpr) e2;
+                    useAs(a, be.type);
+                    useAs(b, "I");
+                    provideAs(e2, be.type);
+                }
+                break;
+                default:
+                    throw new UnsupportedOperationException();
             }
             if (a != null) {
                 exExpr(a);
@@ -835,50 +917,59 @@ public class TypeTransformer implements Transformer {
         private void enexpr(EnExpr enExpr) {
             Value vbs[] = enExpr.ops;
             switch (enExpr.vt) {
-            case INVOKE_NEW:
-            case INVOKE_INTERFACE:
-            case INVOKE_SPECIAL:
-            case INVOKE_STATIC:
-            case INVOKE_VIRTUAL:
-                InvokeExpr ie = (InvokeExpr) enExpr;
-                String type = ie.vt == VT.INVOKE_NEW ? ie.owner : ie.ret;
-                provideAs(enExpr, type);
-                useAs(enExpr, type); // no one else will use it
+                case INVOKE_NEW:
+                case INVOKE_INTERFACE:
+                case INVOKE_SPECIAL:
+                case INVOKE_STATIC:
+                case INVOKE_VIRTUAL:
+                case INVOKE_POLYMORPHIC:
+                case INVOKE_CUSTOM: {
+                    AbstractInvokeExpr ice = (AbstractInvokeExpr) enExpr;
+                    String type = ice.getProto().getReturnType();
+                    provideAs(enExpr, type);
+                    useAs(enExpr, type); // no one else will use it
 
-                int start = 0;
-                if (ie.vt != VT.INVOKE_STATIC && ie.vt != VT.INVOKE_NEW) {
-                    start = 1;
-                    useAs(vbs[0], ie.owner);
-                }
-                for (int i = 0; start < vbs.length; start++, i++) {
-                    useAs(vbs[start], ie.args[i]);
-                }
-                break;
-            case FILLED_ARRAY:
-                FilledArrayExpr fae = (FilledArrayExpr) enExpr;
-                for (Value vb : vbs) {
-                    useAs(vb, fae.type);
-                }
-                provideAs(fae, "[" + fae.type);
-                break;
-            case NEW_MUTI_ARRAY:
-                NewMutiArrayExpr nmae = (NewMutiArrayExpr) enExpr;
-                for (Value vb : vbs) {
-                    useAs(vb, "I");
-                }
-                StringBuilder sb = new StringBuilder();
-                for (int i = 0; i < nmae.dimension; i++) {
-                    sb.append('[');
-                }
-                sb.append(nmae.baseType);
-                provideAs(nmae, sb.toString());
-                break;
-            case PHI:
-                for (Value vb : vbs) {
-                    linkFromTo(vb, enExpr);
+                    String argTypes[] = ice.getProto().getParameterTypes();
+                    if (argTypes.length == vbs.length) {
+                        for (int i = 0; i < vbs.length; i++) {
+                            useAs(vbs[i], argTypes[i]);
+                        }
+                    } else if (argTypes.length + 1 == vbs.length) {
+                        useAs(vbs[0], "L");
+                        for (int i = 1; i < vbs.length; i++) {
+                            useAs(vbs[i], argTypes[i - 1]);
+                        }
+                    } else {
+                        throw new RuntimeException();
+                    }
                 }
                 break;
-            default:
+
+                case FILLED_ARRAY:
+                    FilledArrayExpr fae = (FilledArrayExpr) enExpr;
+                    for (Value vb : vbs) {
+                        useAs(vb, fae.type);
+                    }
+                    provideAs(fae, "[" + fae.type);
+                    break;
+                case NEW_MUTI_ARRAY:
+                    NewMutiArrayExpr nmae = (NewMutiArrayExpr) enExpr;
+                    for (Value vb : vbs) {
+                        useAs(vb, "I");
+                    }
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < nmae.dimension; i++) {
+                        sb.append('[');
+                    }
+                    sb.append(nmae.baseType);
+                    provideAs(nmae, sb.toString());
+                    break;
+                case PHI:
+                    for (Value vb : vbs) {
+                        linkFromTo(vb, enExpr);
+                    }
+                    break;
+                default:
             }
             for (Value vb : enExpr.ops) {
                 exExpr(vb);
@@ -892,18 +983,18 @@ public class TypeTransformer implements Transformer {
         private void exExpr(Value op, boolean getValue) {
 
             switch (op.et) {
-            case E0:
-                e0expr((E0Expr) op, getValue);
-                break;
-            case E1:
-                e1expr((E1Expr) op, getValue);
-                break;
-            case E2:
-                e2expr((E2Expr) op, getValue);
-                break;
-            case En:
-                enexpr((EnExpr) op);
-                break;
+                case E0:
+                    e0expr((E0Expr) op, getValue);
+                    break;
+                case E1:
+                    e1expr((E1Expr) op, getValue);
+                    break;
+                case E2:
+                    e2expr((E2Expr) op, getValue);
+                    break;
+                case En:
+                    enexpr((EnExpr) op);
+                    break;
             }
         }
 
@@ -927,7 +1018,10 @@ public class TypeTransformer implements Transformer {
                 root.gArrayValues = new HashSet<>(3);
             }
             root.gArrayValues.add(value);
-            value.arrayRoot = root;
+            if (value.arrayRoots == null) {
+                value.arrayRoots = new HashSet<>(3);
+            }
+            value.arrayRoots.add(root);
         }
 
         private void linkSetArray(Value array, Value v) {
@@ -937,7 +1031,10 @@ public class TypeTransformer implements Transformer {
                 root.sArrayValues = new HashSet<>(3);
             }
             root.sArrayValues.add(value);
-            value.arrayRoot = root;
+            if (value.arrayRoots == null) {
+                value.arrayRoots = new HashSet<>(3);
+            }
+            value.arrayRoots.add(root);
         }
 
         private void linkFromTo(Value from, Value to) {
@@ -954,8 +1051,8 @@ public class TypeTransformer implements Transformer {
         }
 
         private void provideAs(Value op, String type) {
-            TypeRef typeRef = getDefTypeRef(op);
-            typeRef.setProvideDesc(type);
+            TypeRef typeRef = getDefTypeRef(op).getReal();
+            typeRef.provideDesc = (type);
             typeRef.updateTypeClass(TypeClass.clzOf(type));
         }
 
@@ -965,26 +1062,26 @@ public class TypeTransformer implements Transformer {
             }
             Value op = s.op;
             switch (s.st) {
-            case LOOKUP_SWITCH:
-            case TABLE_SWITCH:
-                useAs(op, "I");
-                break;
-            case GOTO:
-                break;
-            case IF:
-                useAs(op, "Z");
-                break;
-            case LOCK:
-            case UNLOCK:
-                useAs(op, "L");
-                break;
-            case THROW:
-                useAs(op, "Ljava/lang/Throwable;");
-                break;
-            case RETURN:
-                useAs(op, method.ret);
-                break;
-            default:
+                case LOOKUP_SWITCH:
+                case TABLE_SWITCH:
+                    useAs(op, "I");
+                    break;
+                case GOTO:
+                    break;
+                case IF:
+                    useAs(op, "Z");
+                    break;
+                case LOCK:
+                case UNLOCK:
+                    useAs(op, "L");
+                    break;
+                case THROW:
+                    useAs(op, "Ljava/lang/Throwable;");
+                    break;
+                case RETURN:
+                    useAs(op, method.ret);
+                    break;
+                default:
             }
             exExpr(op);
         }
@@ -1004,27 +1101,27 @@ public class TypeTransformer implements Transformer {
         private void sxStmt() {
             for (Stmt p = method.stmts.getFirst(); p != null; p = p.getNext()) {
                 switch (p.et) {
-                case E0:
-                    // label, nop and return-void
-                    if (p.st == ST.LABEL) {
-                        LabelStmt labelStmt = (LabelStmt) p;
-                        if (labelStmt.phis != null) {
-                            for (AssignStmt phi : labelStmt.phis) {
-                                s2stmt(phi);
+                    case E0:
+                        // label, nop and return-void
+                        if (p.st == ST.LABEL) {
+                            LabelStmt labelStmt = (LabelStmt) p;
+                            if (labelStmt.phis != null) {
+                                for (AssignStmt phi : labelStmt.phis) {
+                                    s2stmt(phi);
+                                }
                             }
                         }
-                    }
-                    break;
-                case E1:
-                    s1stmt((E1Stmt) p);
-                    break;
-                case E2:
-                    s2stmt((E2Stmt) p);
-                    break;
-                case En:
-                    // no stmt yet
-                    // enstmt((EnStmt) p, refs, relationRefs);
-                    break;
+                        break;
+                    case E1:
+                        s1stmt((E1Stmt) p);
+                        break;
+                    case E2:
+                        s2stmt((E2Stmt) p);
+                        break;
+                    case En:
+                        // no stmt yet
+                        // enstmt((EnStmt) p, refs, relationRefs);
+                        break;
                 }
             }
         }
